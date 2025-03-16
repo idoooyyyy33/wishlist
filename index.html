@@ -89,6 +89,10 @@
             opacity: 0.9;
         }
 
+        .btn-delete {
+            background-color: #ff6b6b;
+        }
+
         .tabs {
             display: flex;
             gap: 0.5rem;
@@ -152,6 +156,23 @@
             padding: 1rem;
         }
 
+        .completed {
+            opacity: 0.7;
+        }
+
+        .completed h3 {
+            text-decoration: line-through;
+        }
+
+        .error-message {
+            color: #ff6b6b;
+            background-color: #ffe5e5;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: none;
+        }
+
         @media (max-width: 768px) {
             .container {
                 margin: 1rem auto;
@@ -175,6 +196,9 @@
                 <div class="tab" id="addTab" onclick="showSection('add')">Add New</div>
             </div>
 
+            <!-- Tambahkan div untuk menampilkan pesan error -->
+            <div id="errorMessage" class="error-message"></div>
+
             <div id="viewSection">
                 <div class="tabs">
                     <div class="tab active" id="allTab" onclick="filterWishlist('all')">All</div>
@@ -189,49 +213,89 @@
             <div id="addSection" style="display: none;">
                 <input type="text" id="wishText" class="form-control" placeholder="What's your wish?">
                 <textarea id="wishDescription" class="form-control" placeholder="Description (optional)"></textarea>
-                <button onclick="addWish()" class="btn btn-primary">Add Wish</button>
+                <button id="addWishBtn" class="btn btn-primary">Add Wish</button>
             </div>
         </div>
     </div>
 
     <script>
         // Konfigurasi Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyCLPp1SArD56_WnYT0hZMg6SVGIBd9kM9c",
-            authDomain: "html-51404.firebaseapp.com",
-            projectId: "html-51404",
-            storageBucket: "html-51404.firebasestorage.app",
-            messagingSenderId: "346577920082",
-            appId: "1:346577920082:web:3f51a175ff28047a17ff8b",
-            measurementId: "G-8CX5TQSB42",
-            databaseURL: "https://html-51404-default-rtdb.firebaseio.com" // Penting: tambahkan URL database
-        };
+      = {
+ Kunci apiKey: "AIzaSyCLPp1SArD56_WnYT0hZMg6SVGIBd9kM9c",
+  authDomain: "html-51404.firebaseapp.com",
+  databaseURL: "https://html-51404-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "html-51404",
+ penyimpananbucket: "html-51404.firebasestorage.app",
+ MessagingSenderId: "346577920082",
+  appId: "1:346577920082:web:3f51a175ff28047a17ff8b",
+  measurementId: "G-8CX5TQSB42"}; Inisialisasi Firebaseconst app = initializeApp(firebaseConfig);const analytics = getAnalytics(aplikasi
 
-        // Initialize Firebase dengan logging
-        console.log("Mencoba inisialisasi Firebase");
-        firebase.initializeApp(firebaseConfig);
-        console.log("Firebase diinisialisasi:", firebase);
-        
-        const database = firebase.database();
-        console.log("Referensi database dibuat:", database);
-        
-        const wishesRef = database.ref('wishes');
-        console.log("Referensi wishes dibuat:", wishesRef);
-        
+
+
+
+);
+        let database;
+        let wishesRef;
         let currentFilter = 'all';
         let wishes = [];
+        let firebaseInitialized = false;
+
+        // Fungsi untuk menampilkan pesan error
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000); // Hilangkan pesan setelah 5 detik
+        }
+
+        // Initialize Firebase dengan penanganan error
+        function initializeFirebase() {
+            try {
+                console.log("Mencoba inisialisasi Firebase");
+                if (!firebase) {
+                    throw new Error("Firebase SDK tidak tersedia");
+                }
+                
+                firebase.initializeApp(firebaseConfig);
+                console.log("Firebase diinisialisasi:", firebase);
+                
+                database = firebase.database();
+                console.log("Referensi database dibuat:", database);
+                
+                wishesRef = database.ref('wishes');
+                console.log("Referensi wishes dibuat:", wishesRef);
+                
+                firebaseInitialized = true;
+                loadWishes();
+            } catch (error) {
+                console.error("Error inisialisasi Firebase:", error);
+                showError("Gagal menghubungkan ke database: " + error.message);
+            }
+        }
 
         // Load wishes dari Firebase dengan penanganan error
         function loadWishes() {
             console.log("Memulai loadWishes()");
+            if (!firebaseInitialized) {
+                showError("Database belum siap. Coba muat ulang halaman.");
+                return;
+            }
+            
+            document.getElementById('wishlistItems').innerHTML = '<div class="loader">Loading wishes...</div>';
+            
             wishesRef.on('value', (snapshot) => {
                 console.log("Data diterima dari Firebase:", snapshot.val());
                 wishes = [];
-                snapshot.forEach((childSnapshot) => {
-                    const wish = childSnapshot.val();
-                    wish.id = childSnapshot.key;
-                    wishes.push(wish);
-                });
+                
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnapshot) => {
+                        const wish = childSnapshot.val();
+                        wish.id = childSnapshot.key;
+                        wishes.push(wish);
+                    });
+                }
                 
                 console.log("Wishes yang diproses:", wishes);
                 // Sort wishes by date (newest first)
@@ -242,6 +306,7 @@
                 console.error("Error loading Firebase data:", error);
                 document.getElementById('wishlistItems').innerHTML = 
                     '<p>Error memuat wishes: ' + error.message + '</p>';
+                showError("Gagal memuat data: " + error.message);
             });
         }
 
@@ -277,12 +342,24 @@
         }
 
         function addWish() {
-            const text = document.getElementById('wishText').value.trim();
-            const description = document.getElementById('wishDescription').value.trim();
-            
-            console.log("Menambahkan wish:", text);
-            
-            if (text) {
+            try {
+                const text = document.getElementById('wishText').value.trim();
+                const description = document.getElementById('wishDescription').value.trim();
+                
+                console.log("Tombol Add Wish diklik, text:", text);
+                
+                if (!text) {
+                    showError('Mohon isi judul wish!');
+                    return;
+                }
+                
+                // Periksa apakah Firebase terhubung
+                if (!firebaseInitialized || !firebase || !firebase.database || !wishesRef) {
+                    console.error("Firebase belum siap!");
+                    showError("Koneksi ke database belum siap. Silakan muat ulang halaman.");
+                    return;
+                }
+                
                 const wish = {
                     text: text,
                     description: description,
@@ -290,47 +367,70 @@
                     date: new Date().toISOString()
                 };
                 
-                // Add to Firebase dengan promise handling
-                console.log("Menyimpan ke Firebase:", wish);
+                console.log("Mencoba menyimpan wish:", wish);
                 
-                wishesRef.push(wish)
-                    .then(() => {
-                        console.log("Wish berhasil ditambahkan!");
-                        // Clear inputs
+                // Gunakan callback daripada Promise untuk kompatibilitas yang lebih baik
+                wishesRef.push(wish, function(error) {
+                    if (error) {
+                        console.error("Error saat menyimpan wish:", error);
+                        showError("Gagal menyimpan wish: " + error.message);
+                    } else {
+                        console.log("Wish berhasil disimpan!");
                         document.getElementById('wishText').value = '';
                         document.getElementById('wishDescription').value = '';
-                        
-                        // Show success message
-                        alert('Wish berhasil ditambahkan!');
-                        
-                        // Switch to view section
                         showSection('view');
-                    })
-                    .catch((error) => {
-                        console.error("Error menambahkan wish:", error);
-                        alert('Error menambahkan wish: ' + error.message);
-                    });
+                    }
+                });
+            } catch (e) {
+                console.error("Error dalam fungsi addWish:", e);
+                showError("Terjadi kesalahan: " + e.message);
             }
         }
 
         function toggleWish(id) {
-            console.log("Toggle wish:", id);
-            const wish = wishes.find(w => w.id === id);
-            if (wish) {
-                wishesRef.child(id).update({
-                    completed: !wish.completed
-                })
-                .then(() => console.log("Status wish diperbarui"))
-                .catch(error => console.error("Error memperbarui wish:", error));
+            try {
+                console.log("Toggle wish:", id);
+                if (!firebaseInitialized) {
+                    showError("Database belum siap");
+                    return;
+                }
+                
+                const wish = wishes.find(w => w.id === id);
+                if (wish) {
+                    wishesRef.child(id).update({
+                        completed: !wish.completed
+                    })
+                    .then(() => console.log("Status wish diperbarui"))
+                    .catch(error => {
+                        console.error("Error memperbarui wish:", error);
+                        showError("Gagal memperbarui status: " + error.message);
+                    });
+                }
+            } catch (e) {
+                console.error("Error dalam toggleWish:", e);
+                showError("Gagal mengubah status: " + e.message);
             }
         }
 
         function deleteWish(id) {
-            if (confirm('Apakah Anda yakin ingin menghapus wish ini?')) {
-                console.log("Menghapus wish:", id);
-                wishesRef.child(id).remove()
-                    .then(() => console.log("Wish berhasil dihapus"))
-                    .catch(error => console.error("Error menghapus wish:", error));
+            try {
+                if (confirm('Apakah Anda yakin ingin menghapus wish ini?')) {
+                    console.log("Menghapus wish:", id);
+                    if (!firebaseInitialized) {
+                        showError("Database belum siap");
+                        return;
+                    }
+                    
+                    wishesRef.child(id).remove()
+                        .then(() => console.log("Wish berhasil dihapus"))
+                        .catch(error => {
+                            console.error("Error menghapus wish:", error);
+                            showError("Gagal menghapus wish: " + error.message);
+                        });
+                }
+            } catch (e) {
+                console.error("Error dalam deleteWish:", e);
+                showError("Gagal menghapus: " + e.message);
             }
         }
 
@@ -339,7 +439,7 @@
             const container = document.getElementById('wishlistItems');
             container.innerHTML = '';
             
-            let filteredWishes = wishes;
+            let filteredWishes = wisheslet filteredWishes = wishes;
             if (currentFilter === 'pending') {
                 filteredWishes = wishes.filter(w => !w.completed);
             } else if (currentFilter === 'completed') {
@@ -363,18 +463,43 @@
                         <button onclick="toggleWish('${wish.id}')" class="btn btn-primary">
                             ${wish.completed ? 'Undo' : 'Complete'}
                         </button>
-                        <button onclick="deleteWish('${wish.id}')" class="btn btn-primary">Delete</button>
+                        <button onclick="deleteWish('${wish.id}')" class="btn btn-delete">Delete</button>
                     </div>
                 `;
                 container.appendChild(wishElement);
             });
         }
 
-        // Initialize dan periksa koneksi Firebase
-        window.onload = function() {
-            console.log("Window loaded, memulai aplikasi");
-            loadWishes();
-        };
+        // Event listener untuk tombol Add Wish
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM loaded, siap menambahkan event listeners");
+            
+            // Inisialisasi Firebase
+            initializeFirebase();
+            
+            // Tambahkan event listener untuk tombol add wish
+            const addButton = document.getElementById('addWishBtn');
+            if (addButton) {
+                console.log("Tombol Add Wish ditemukan, menambahkan event listener");
+                addButton.addEventListener('click', function(e) {
+                    console.log("Tombol Add Wish diklik melalui event listener!");
+                    addWish();
+                });
+            } else {
+                console.error("Tombol Add Wish tidak ditemukan!");
+            }
+            
+            // Tambahkan event listener untuk input agar bisa di-submit dengan Enter
+            const wishText = document.getElementById('wishText');
+            if (wishText) {
+                wishText.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        console.log("Enter ditekan pada input text");
+                        addWish();
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>
