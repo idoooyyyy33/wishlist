@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wishlist Ido dan Ara</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
     <style>
         :root {
             --primary-color: #FF99C8;
@@ -144,6 +147,11 @@
             padding: 0.5rem;
         }
 
+        .loader {
+            text-align: center;
+            padding: 1rem;
+        }
+
         @media (max-width: 768px) {
             .container {
                 margin: 1rem auto;
@@ -173,7 +181,9 @@
                     <div class="tab" onclick="filterWishlist('pending')">Pending</div>
                     <div class="tab" onclick="filterWishlist('completed')">Completed</div>
                 </div>
-                <div id="wishlistItems"></div>
+                <div id="wishlistItems">
+                    <div class="loader">Loading wishes...</div>
+                </div>
             </div>
 
             <div id="addSection" style="display: none;">
@@ -185,8 +195,41 @@
     </div>
 
     <script>
+        // Firebase configuration - REPLACE WITH YOUR OWN CONFIG
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const wishesRef = database.ref('wishes');
+        
         let currentFilter = 'all';
-        let wishes = JSON.parse(localStorage.getItem('wishes') || '[]');
+        let wishes = [];
+
+        // Load wishes from Firebase
+        function loadWishes() {
+            wishesRef.on('value', (snapshot) => {
+                wishes = [];
+                snapshot.forEach((childSnapshot) => {
+                    const wish = childSnapshot.val();
+                    wish.id = childSnapshot.key;
+                    wishes.push(wish);
+                });
+                
+                // Sort wishes by date (newest first)
+                wishes.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                displayWishes();
+            });
+        }
 
         function showSection(section) {
             document.querySelectorAll('.tabs .tab').forEach(tab => tab.classList.remove('active'));
@@ -195,7 +238,6 @@
             if (section === 'view') {
                 document.getElementById('viewSection').style.display = 'block';
                 document.getElementById('addSection').style.display = 'none';
-                displayWishes();
             } else {
                 document.getElementById('viewSection').style.display = 'none';
                 document.getElementById('addSection').style.display = 'block';
@@ -215,15 +257,14 @@
             
             if (text) {
                 const wish = {
-                    id: Date.now(),
                     text: text,
                     description: description,
                     completed: false,
                     date: new Date().toISOString()
                 };
                 
-                wishes.unshift(wish); // Add to beginning of array
-                localStorage.setItem('wishes', JSON.stringify(wishes));
+                // Add to Firebase
+                wishesRef.push(wish);
                 
                 // Clear inputs
                 document.getElementById('wishText').value = '';
@@ -232,26 +273,23 @@
                 // Show success message
                 alert('Wish added successfully!');
                 
-                // Switch to view section and display wishes
+                // Switch to view section
                 showSection('view');
-                displayWishes();
             }
         }
 
         function toggleWish(id) {
             const wish = wishes.find(w => w.id === id);
             if (wish) {
-                wish.completed = !wish.completed;
-                localStorage.setItem('wishes', JSON.stringify(wishes));
-                displayWishes();
+                wishesRef.child(id).update({
+                    completed: !wish.completed
+                });
             }
         }
 
         function deleteWish(id) {
             if (confirm('Are you sure you want to delete this wish?')) {
-                wishes = wishes.filter(w => w.id !== id);
-                localStorage.setItem('wishes', JSON.stringify(wishes));
-                displayWishes();
+                wishesRef.child(id).remove();
             }
         }
 
@@ -266,6 +304,11 @@
                 filteredWishes = wishes.filter(w => w.completed);
             }
             
+            if (filteredWishes.length === 0) {
+                container.innerHTML = '<p>No wishes found.</p>';
+                return;
+            }
+            
             filteredWishes.forEach(wish => {
                 const wishElement = document.createElement('div');
                 wishElement.className = `wishlist-item ${wish.completed ? 'completed' : ''}`;
@@ -273,18 +316,18 @@
                     <h3>${wish.text}</h3>
                     ${wish.description ? `<p>${wish.description}</p>` : ''}
                     <div class="item-actions">
-                        <button onclick="toggleWish(${wish.id})" class="btn btn-primary">
+                        <button onclick="toggleWish('${wish.id}')" class="btn btn-primary">
                             ${wish.completed ? 'Undo' : 'Complete'}
                         </button>
-                        <button onclick="deleteWish(${wish.id})" class="btn btn-primary">Delete</button>
+                        <button onclick="deleteWish('${wish.id}')" class="btn btn-primary">Delete</button>
                     </div>
                 `;
                 container.appendChild(wishElement);
             });
         }
 
-        // Initialize display
-        displayWishes();
+        // Initialize
+        loadWishes();
     </script>
 </body>
 </html>
