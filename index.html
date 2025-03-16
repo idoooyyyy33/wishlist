@@ -171,15 +171,15 @@
 
         <div class="card">
             <div class="tabs">
-                <div class="tab active" onclick="showSection('view')">View Wishlist</div>
-                <div class="tab" onclick="showSection('add')">Add New</div>
+                <div class="tab active" id="viewTab" onclick="showSection('view')">View Wishlist</div>
+                <div class="tab" id="addTab" onclick="showSection('add')">Add New</div>
             </div>
 
             <div id="viewSection">
                 <div class="tabs">
-                    <div class="tab active" onclick="filterWishlist('all')">All</div>
-                    <div class="tab" onclick="filterWishlist('pending')">Pending</div>
-                    <div class="tab" onclick="filterWishlist('completed')">Completed</div>
+                    <div class="tab active" id="allTab" onclick="filterWishlist('all')">All</div>
+                    <div class="tab" id="pendingTab" onclick="filterWishlist('pending')">Pending</div>
+                    <div class="tab" id="completedTab" onclick="filterWishlist('completed')">Completed</div>
                 </div>
                 <div id="wishlistItems">
                     <div class="loader">Loading wishes...</div>
@@ -195,28 +195,37 @@
     </div>
 
     <script>
-       // Konfigurasi Firebase - Gunakan konfigurasi dari gambar Anda
-const firebaseConfig = {
-  apiKey: "AIzaSyCLPp1SArD56_WnYT0hZMg6SVGIBd9kM9c",
-  authDomain: "html-51404.firebaseapp.com",
-  projectId: "html-51404",
-  storageBucket: "html-51404.firebasestorage.app",
-  messagingSenderId: "346577920082",
-  appId: "1:346577920082:web:3f51a175ff28047a17ff8b",
-  measurementId: "G-8CX5TQSB42"
-};
+        // Konfigurasi Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLPp1SArD56_WnYT0hZMg6SVGIBd9kM9c",
+            authDomain: "html-51404.firebaseapp.com",
+            projectId: "html-51404",
+            storageBucket: "html-51404.firebasestorage.app",
+            messagingSenderId: "346577920082",
+            appId: "1:346577920082:web:3f51a175ff28047a17ff8b",
+            measurementId: "G-8CX5TQSB42",
+            databaseURL: "https://html-51404-default-rtdb.firebaseio.com" // Penting: tambahkan URL database
+        };
 
-        // Initialize Firebase
+        // Initialize Firebase dengan logging
+        console.log("Mencoba inisialisasi Firebase");
         firebase.initializeApp(firebaseConfig);
+        console.log("Firebase diinisialisasi:", firebase);
+        
         const database = firebase.database();
+        console.log("Referensi database dibuat:", database);
+        
         const wishesRef = database.ref('wishes');
+        console.log("Referensi wishes dibuat:", wishesRef);
         
         let currentFilter = 'all';
         let wishes = [];
 
-        // Load wishes from Firebase
+        // Load wishes dari Firebase dengan penanganan error
         function loadWishes() {
+            console.log("Memulai loadWishes()");
             wishesRef.on('value', (snapshot) => {
+                console.log("Data diterima dari Firebase:", snapshot.val());
                 wishes = [];
                 snapshot.forEach((childSnapshot) => {
                     const wish = childSnapshot.val();
@@ -224,36 +233,54 @@ const firebaseConfig = {
                     wishes.push(wish);
                 });
                 
+                console.log("Wishes yang diproses:", wishes);
                 // Sort wishes by date (newest first)
                 wishes.sort((a, b) => new Date(b.date) - new Date(a.date));
                 
                 displayWishes();
+            }, (error) => {
+                console.error("Error loading Firebase data:", error);
+                document.getElementById('wishlistItems').innerHTML = 
+                    '<p>Error memuat wishes: ' + error.message + '</p>';
             });
         }
 
         function showSection(section) {
-            document.querySelectorAll('.tabs .tab').forEach(tab => tab.classList.remove('active'));
-            event.target.classList.add('active');
+            console.log("Menampilkan section:", section);
+            document.querySelectorAll('.tabs .tab').forEach(tab => {
+                if (tab.id === 'viewTab' || tab.id === 'addTab') {
+                    tab.classList.remove('active');
+                }
+            });
             
             if (section === 'view') {
+                document.getElementById('viewTab').classList.add('active');
                 document.getElementById('viewSection').style.display = 'block';
                 document.getElementById('addSection').style.display = 'none';
             } else {
+                document.getElementById('addTab').classList.add('active');
                 document.getElementById('viewSection').style.display = 'none';
                 document.getElementById('addSection').style.display = 'block';
             }
         }
 
         function filterWishlist(filter) {
+            console.log("Memfilter wishlist:", filter);
             currentFilter = filter;
-            document.querySelectorAll('#viewSection .tabs .tab').forEach(tab => tab.classList.remove('active'));
-            event.target.classList.add('active');
+            
+            document.querySelectorAll('#viewSection .tabs .tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(filter + 'Tab').classList.add('active');
             displayWishes();
         }
 
         function addWish() {
             const text = document.getElementById('wishText').value.trim();
             const description = document.getElementById('wishDescription').value.trim();
+            
+            console.log("Menambahkan wish:", text);
             
             if (text) {
                 const wish = {
@@ -263,37 +290,52 @@ const firebaseConfig = {
                     date: new Date().toISOString()
                 };
                 
-                // Add to Firebase
-                wishesRef.push(wish);
+                // Add to Firebase dengan promise handling
+                console.log("Menyimpan ke Firebase:", wish);
                 
-                // Clear inputs
-                document.getElementById('wishText').value = '';
-                document.getElementById('wishDescription').value = '';
-                
-                // Show success message
-                alert('Wish added successfully!');
-                
-                // Switch to view section
-                showSection('view');
+                wishesRef.push(wish)
+                    .then(() => {
+                        console.log("Wish berhasil ditambahkan!");
+                        // Clear inputs
+                        document.getElementById('wishText').value = '';
+                        document.getElementById('wishDescription').value = '';
+                        
+                        // Show success message
+                        alert('Wish berhasil ditambahkan!');
+                        
+                        // Switch to view section
+                        showSection('view');
+                    })
+                    .catch((error) => {
+                        console.error("Error menambahkan wish:", error);
+                        alert('Error menambahkan wish: ' + error.message);
+                    });
             }
         }
 
         function toggleWish(id) {
+            console.log("Toggle wish:", id);
             const wish = wishes.find(w => w.id === id);
             if (wish) {
                 wishesRef.child(id).update({
                     completed: !wish.completed
-                });
+                })
+                .then(() => console.log("Status wish diperbarui"))
+                .catch(error => console.error("Error memperbarui wish:", error));
             }
         }
 
         function deleteWish(id) {
-            if (confirm('Are you sure you want to delete this wish?')) {
-                wishesRef.child(id).remove();
+            if (confirm('Apakah Anda yakin ingin menghapus wish ini?')) {
+                console.log("Menghapus wish:", id);
+                wishesRef.child(id).remove()
+                    .then(() => console.log("Wish berhasil dihapus"))
+                    .catch(error => console.error("Error menghapus wish:", error));
             }
         }
 
         function displayWishes() {
+            console.log("Menampilkan wishes dengan filter:", currentFilter);
             const container = document.getElementById('wishlistItems');
             container.innerHTML = '';
             
@@ -303,6 +345,8 @@ const firebaseConfig = {
             } else if (currentFilter === 'completed') {
                 filteredWishes = wishes.filter(w => w.completed);
             }
+            
+            console.log("Jumlah wishes setelah filter:", filteredWishes.length);
             
             if (filteredWishes.length === 0) {
                 container.innerHTML = '<p>No wishes found.</p>';
@@ -326,8 +370,11 @@ const firebaseConfig = {
             });
         }
 
-        // Initialize
-        loadWishes();
+        // Initialize dan periksa koneksi Firebase
+        window.onload = function() {
+            console.log("Window loaded, memulai aplikasi");
+            loadWishes();
+        };
     </script>
 </body>
 </html>
