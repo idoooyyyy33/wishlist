@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wishlist Ido dan Ara</title>
+    <!-- Add favicon to prevent 404 errors -->
+    <link rel="icon" href="data:,">
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
@@ -191,6 +193,7 @@
                 <p>Masuk untuk melanjutkan</p>
             </div>
             <button id="googleLoginBtn" class="btn btn-primary">Login dengan Google</button>
+            <button id="googleRedirectBtn" class="btn btn-primary" style="margin-top: 10px;">Login dengan Google (Redirect)</button>
             <div id="loginMessage" style="color: #FF4F81; margin-top: 1rem; text-align: center;"></div>
         </div>
     </div>
@@ -230,285 +233,344 @@
     </div>
 
     <script>
+        // Add global error handler
+        window.onerror = function(message, source, line, column, error) {
+            console.error("Error detected:", message);
+            console.error("Source:", source);
+            console.error("Line:", line);
+            console.error("Column:", column);
+            console.error("Error object:", error);
+            alert("Error terdeteksi: " + message + " di baris " + line);
+            return true;
+        };
+
         // Konfigurasi Firebase yang benar
-const firebaseConfig = {
-    apiKey: "AIzaSyCLPp1SArD56_WnYT0hZMg6SVGIBd9kM9c",
-    authDomain: "html-51404.firebaseapp.com",
-    databaseURL: "https://html-51404-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "html-51404",
-    storageBucket: "html-51404.firebasestorage.app",
-    messagingSenderId: "346577920082",
-    appId: "1:346577920082:web:3f51a175ff28047a17ff8b",
-    measurementId: "G-8CX5TQSB42"
-};
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLPp1SArD56_WnYT0hZMg6SVGIBd9kM9c",
+            authDomain: "html-51404.firebaseapp.com",
+            databaseURL: "https://html-51404-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "html-51404",
+            storageBucket: "html-51404.firebasestorage.app",
+            messagingSenderId: "346577920082",
+            appId: "1:346577920082:web:3f51a175ff28047a17ff8b",
+            measurementId: "G-8CX5TQSB42"
+        };
+        
         // Inisialisasi Firebase
         console.log("Mencoba inisialisasi Firebase");
-        firebase.initializeApp(firebaseConfig);
-        console.log("Firebase diinisialisasi:", firebase);
-        
-        const database = firebase.database();
-        console.log("Referensi database dibuat:", database);
-        
-        const wishesRef = database.ref('wishes');
-        console.log("Referensi wishes dibuat:", wishesRef);
-        
-        // Inisialisasi Auth
-        const auth = firebase.auth();
-        const provider = new firebase.auth.GoogleAuthProvider();
-        
-        // Daftar pengguna yang diizinkan (ganti dengan UID sebenarnya)
-        const authorizedUsers = ['UID_IDO', 'UID_ARA']; // GANTI DENGAN UID SEBENARNYA
-        
-        // Referensi elemen UI
-        const loginContainer = document.getElementById('loginContainer');
-        const appContainer = document.getElementById('appContainer');
-        const googleLoginBtn = document.getElementById('googleLoginBtn');
-        const loginMessage = document.getElementById('loginMessage');
-        const userInfo = document.getElementById('userInfo');
-        
-        // Variabel global
-        let currentUser = null;
-        let currentFilter = 'all';
-        let wishes = [];
+        try {
+            firebase.initializeApp(firebaseConfig);
+            console.log("Firebase diinisialisasi:", firebase);
+            
+            const database = firebase.database();
+            console.log("Referensi database dibuat:", database);
+            
+            const wishesRef = database.ref('wishes');
+            console.log("Referensi wishes dibuat:", wishesRef);
+            
+            // Inisialisasi Auth
+            const auth = firebase.auth();
+            const provider = new firebase.auth.GoogleAuthProvider();
+            
+            // Daftar pengguna yang diizinkan (ganti dengan UID sebenarnya)
+            const authorizedUsers = ['UID_IDO', 'UID_ARA']; // GANTI DENGAN UID SEBENARNYA
+            
+            // Referensi elemen UI
+            const loginContainer = document.getElementById('loginContainer');
+            const appContainer = document.getElementById('appContainer');
+            const googleLoginBtn = document.getElementById('googleLoginBtn');
+            const googleRedirectBtn = document.getElementById('googleRedirectBtn');
+            const loginMessage = document.getElementById('loginMessage');
+            const userInfo = document.getElementById('userInfo');
+            
+            // Variabel global
+            let currentUser = null;
+            let currentFilter = 'all';
+            let wishes = [];
 
-        // Login dengan Google
-        googleLoginBtn.addEventListener('click', () => {
-            auth.signInWithPopup(provider)
-                .then((result) => {
-                    console.log("Login berhasil:", result.user);
-                })
-                .catch((error) => {
-                    console.error("Error login:", error);
-                    loginMessage.textContent = "Error login: " + error.message;
-                });
-        });
-
-        // Memantau status otentikasi pengguna
-        auth.onAuthStateChanged((user) => {
-            if (user && authorizedUsers.includes(user.uid)) {
-                // Pengguna yang diizinkan
-                currentUser = user;
-                console.log("Pengguna yang diizinkan:", user.displayName);
+            // Login dengan Google popup
+            googleLoginBtn.addEventListener('click', () => {
+                console.log("Tombol login diklik");
+                loginMessage.textContent = "Mencoba login...";
                 
-                // Menampilkan info pengguna
-                userInfo.innerHTML = `
-                    <img src="${user.photoURL}" alt="Profile">
-                    <span>Hai, ${user.displayName}</span>
-                `;
-                
-                // Menampilkan aplikasi
-                loginContainer.style.display = 'none';
-                appContainer.style.display = 'block';
-                
-                // Memuat wishlist
-                loadWishes();
-            } else if (user) {
-                // Pengguna terautentikasi tetapi tidak diizinkan
-                console.log("Pengguna tidak diizinkan:", user.displayName);
-                loginMessage.textContent = "Maaf, hanya Ido dan Ara yang dapat mengakses aplikasi ini";
-                auth.signOut();
-            } else {
-                // Tidak terautentikasi
-                currentUser = null;
-                console.log("Pengguna tidak terautentikasi");
-                
-                // Menampilkan layar login
-                loginContainer.style.display = 'block';
-                appContainer.style.display = 'none';
-                loginMessage.textContent = "";
-            }
-        });
-
-        // Logout
-        function signOut() {
-            auth.signOut()
-                .then(() => console.log("Berhasil logout"))
-                .catch(error => console.error("Error logout:", error));
-        }
-
-        // Load wishes dari Firebase dengan penanganan error
-        function loadWishes() {
-            console.log("Memulai loadWishes()");
-            wishesRef.on('value', (snapshot) => {
-                console.log("Data diterima dari Firebase:", snapshot.val());
-                wishes = [];
-                snapshot.forEach((childSnapshot) => {
-                    const wish = childSnapshot.val();
-                    wish.id = childSnapshot.key;
-                    wishes.push(wish);
-                });
-                
-                console.log("Wishes yang diproses:", wishes);
-                // Sort wishes by date (newest first)
-                wishes.sort((a, b) => new Date(b.date) - new Date(a.date));
-                
-                displayWishes();
-            }, (error) => {
-                console.error("Error loading Firebase data:", error);
-                document.getElementById('wishlistItems').innerHTML = 
-                    '<p>Error memuat wishes: ' + error.message + '</p>';
-            });
-        }
-
-        function showSection(section) {
-            console.log("Menampilkan section:", section);
-            document.querySelectorAll('.tabs .tab').forEach(tab => {
-                if (tab.id === 'viewTab' || tab.id === 'addTab') {
-                    tab.classList.remove('active');
+                try {
+                    auth.signInWithPopup(provider)
+                        .then((result) => {
+                            console.log("Login berhasil:", result.user);
+                            loginMessage.textContent = "Login berhasil!";
+                        })
+                        .catch((error) => {
+                            console.error("Error login:", error);
+                            loginMessage.textContent = "Error login: " + error.message;
+                            
+                            // Tambahan untuk menangani popup blocker
+                            if (error.code === 'auth/popup-blocked') {
+                                alert("Popup diblokir. Coba izinkan popup atau gunakan metode redirect.");
+                            }
+                        });
+                } catch (e) {
+                    console.error("Exception caught:", e);
+                    loginMessage.textContent = "Kesalahan: " + e.message;
                 }
             });
-            
-            if (section === 'view') {
-                document.getElementById('viewTab').classList.add('active');
-                document.getElementById('viewSection').style.display = 'block';
-                document.getElementById('addSection').style.display = 'none';
-            } else {
-                document.getElementById('addTab').classList.add('active');
-                document.getElementById('viewSection').style.display = 'none';
-                document.getElementById('addSection').style.display = 'block';
-            }
-        }
 
-        function filterWishlist(filter) {
-            console.log("Memfilter wishlist:", filter);
-            currentFilter = filter;
-            
-            document.querySelectorAll('#viewSection .tabs .tab').forEach(tab => {
-                tab.classList.remove('active');
+            // Login dengan Google redirect
+            googleRedirectBtn.addEventListener('click', () => {
+                console.log("Tombol login redirect diklik");
+                loginMessage.textContent = "Redirect ke halaman login Google...";
+                
+                try {
+                    auth.signInWithRedirect(provider)
+                        .catch((error) => {
+                            console.error("Error login redirect:", error);
+                            loginMessage.textContent = "Error login redirect: " + error.message;
+                        });
+                } catch (e) {
+                    console.error("Exception caught:", e);
+                    loginMessage.textContent = "Kesalahan: " + e.message;
+                }
             });
-            
-            document.getElementById(filter + 'Tab').classList.add('active');
-            displayWishes();
-        }
 
-        function addWish() {
-            // Verifikasi jika pengguna terautentikasi
-            if (!currentUser) {
-                alert("Silakan login untuk menambahkan wish");
-                return;
+            // Check for redirect result
+            auth.getRedirectResult().then((result) => {
+                if (result.user) {
+                    console.log("Login redirect berhasil:", result.user);
+                }
+            }).catch((error) => {
+                console.error("Error redirect result:", error);
+                loginMessage.textContent = "Error login: " + error.message;
+            });
+
+            // Memantau status otentikasi pengguna
+            auth.onAuthStateChanged((user) => {
+                if (user && authorizedUsers.includes(user.uid)) {
+                    // Pengguna yang diizinkan
+                    currentUser = user;
+                    console.log("Pengguna yang diizinkan:", user.displayName);
+                    
+                    // Menampilkan info pengguna
+                    userInfo.innerHTML = `
+                        <img src="${user.photoURL}" alt="Profile">
+                        <span>Hai, ${user.displayName}</span>
+                    `;
+                    
+                    // Menampilkan aplikasi
+                    loginContainer.style.display = 'none';
+                    appContainer.style.display = 'block';
+                    
+                    // Memuat wishlist
+                    loadWishes();
+                } else if (user) {
+                    // Pengguna terautentikasi tetapi tidak diizinkan
+                    console.log("Pengguna tidak diizinkan:", user.displayName);
+                    loginMessage.textContent = "Maaf, hanya Ido dan Ara yang dapat mengakses aplikasi ini";
+                    auth.signOut();
+                } else {
+                    // Tidak terautentikasi
+                    currentUser = null;
+                    console.log("Pengguna tidak terautentikasi");
+                    
+                    // Menampilkan layar login
+                    loginContainer.style.display = 'block';
+                    appContainer.style.display = 'none';
+                    loginMessage.textContent = "";
+                }
+            });
+
+            // Logout
+            function signOut() {
+                auth.signOut()
+                    .then(() => console.log("Berhasil logout"))
+                    .catch(error => console.error("Error logout:", error));
             }
-            
-            const text = document.getElementById('wishText').value.trim();
-            const description = document.getElementById('wishDescription').value.trim();
-            
-            console.log("Menambahkan wish:", text);
-            
-            if (text) {
-                const wish = {
-                    text: text,
-                    description: description,
-                    completed: false,
-                    date: new Date().toISOString(),
-                    userId: currentUser.uid,
-                    userEmail: currentUser.email,
-                    createdBy: currentUser.displayName
-                };
-                
-                // Add to Firebase dengan promise handling
-                console.log("Menyimpan ke Firebase:", wish);
-                
-                wishesRef.push(wish)
-                    .then(() => {
-                        console.log("Wish berhasil ditambahkan!");
-                        // Clear inputs
-                        document.getElementById('wishText').value = '';
-                        document.getElementById('wishDescription').value = '';
-                        
-                        // Show success message
-                        alert('Wish berhasil ditambahkan!');
-                        
-                        // Switch to view section
-                        showSection('view');
-                    })
-                    .catch((error) => {
-                        console.error("Error menambahkan wish:", error);
-                        alert('Error menambahkan wish: ' + error.message);
+
+            // Load wishes dari Firebase dengan penanganan error
+            function loadWishes() {
+                console.log("Memulai loadWishes()");
+                wishesRef.on('value', (snapshot) => {
+                    console.log("Data diterima dari Firebase:", snapshot.val());
+                    wishes = [];
+                    snapshot.forEach((childSnapshot) => {
+                        const wish = childSnapshot.val();
+                        wish.id = childSnapshot.key;
+                        wishes.push(wish);
                     });
+                    
+                    console.log("Wishes yang diproses:", wishes);
+                    // Sort wishes by date (newest first)
+                    wishes.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    
+                    displayWishes();
+                }, (error) => {
+                    console.error("Error loading Firebase data:", error);
+                    document.getElementById('wishlistItems').innerHTML = 
+                        '<p>Error memuat wishes: ' + error.message + '</p>';
+                });
             }
-        }
 
-        function toggleWish(id) {
-            console.log("Toggle wish:", id);
-            const wish = wishes.find(w => w.id === id);function toggleWish(id) {
-            console.log("Toggle wish:", id);
-            const wish = wishes.find(w => w.id === id);
-            if (wish) {
-                wishesRef.child(id).update({
-                    completed: !wish.completed,
-                    completedBy: !wish.completed ? currentUser.displayName : null,
-                    completedDate: !wish.completed ? new Date().toISOString() : null
-                })
-                .then(() => console.log("Status wish diperbarui"))
-                .catch(error => console.error("Error memperbarui wish:", error));
-            }
-        }
-
-        function deleteWish(id) {
-            if (confirm('Apakah Anda yakin ingin menghapus wish ini?')) {
-                console.log("Menghapus wish:", id);
-                wishesRef.child(id).remove()
-                    .then(() => console.log("Wish berhasil dihapus"))
-                    .catch(error => console.error("Error menghapus wish:", error));
-            }
-        }
-
-        function displayWishes() {
-            console.log("Menampilkan wishes dengan filter:", currentFilter);
-            const container = document.getElementById('wishlistItems');
-            container.innerHTML = '';
-            
-            let filteredWishes = wishes;
-            if (currentFilter === 'pending') {
-                filteredWishes = wishes.filter(w => !w.completed);
-            } else if (currentFilter === 'completed') {
-                filteredWishes = wishes.filter(w => w.completed);
-            }
-            
-            console.log("Jumlah wishes setelah filter:", filteredWishes.length);
-            
-            if (filteredWishes.length === 0) {
-                container.innerHTML = '<p>Tidak ada wishes yang ditemukan.</p>';
-                return;
-            }
-            
-            filteredWishes.forEach(wish => {
-                const wishElement = document.createElement('div');
-                wishElement.className = `wishlist-item ${wish.completed ? 'completed' : ''}`;
+            function showSection(section) {
+                console.log("Menampilkan section:", section);
+                document.querySelectorAll('.tabs .tab').forEach(tab => {
+                    if (tab.id === 'viewTab' || tab.id === 'addTab') {
+                        tab.classList.remove('active');
+                    }
+                });
                 
-                let createdInfo = wish.createdBy ? `Dibuat oleh: ${wish.createdBy}` : '';
-                let completedInfo = wish.completed && wish.completedBy ? 
-                    `<p><em>Diselesaikan oleh ${wish.completedBy} pada ${formatDate(wish.completedDate)}</em></p>` : '';
-                
-                wishElement.innerHTML = `
-                    <h3>${wish.text}</h3>
-                    ${wish.description ? `<p>${wish.description}</p>` : ''}
-                    <p><small>${createdInfo} • ${formatDate(wish.date)}</small></p>
-                    ${completedInfo}
-                    <div class="item-actions">
-                        <button onclick="toggleWish('${wish.id}')" class="btn btn-primary">
-                            ${wish.completed ? 'Batalkan' : 'Selesai'}
-                        </button>
-                        <button onclick="deleteWish('${wish.id}')" class="btn btn-primary">Hapus</button>
-                    </div>
-                `;
-                container.appendChild(wishElement);
-            });
-        }
+                if (section === 'view') {
+                    document.getElementById('viewTab').classList.add('active');
+                    document.getElementById('viewSection').style.display = 'block';
+                    document.getElementById('addSection').style.display = 'none';
+                } else {
+                    document.getElementById('addTab').classList.add('active');
+                    document.getElementById('viewSection').style.display = 'none';
+                    document.getElementById('addSection').style.display = 'block';
+                }
+            }
 
-        // Format tanggal menjadi format yang lebih mudah dibaca
-        function formatDate(dateString) {
-            if (!dateString) return '';
-            
-            const date = new Date(dateString);
-            const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-            return date.toLocaleDateString('id-ID', options);
+            function filterWishlist(filter) {
+                console.log("Memfilter wishlist:", filter);
+                currentFilter = filter;
+                
+                document.querySelectorAll('#viewSection .tabs .tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                document.getElementById(filter + 'Tab').classList.add('active');
+                displayWishes();
+            }
+
+            function addWish() {
+                // Verifikasi jika pengguna terautentikasi
+                if (!currentUser) {
+                    alert("Silakan login untuk menambahkan wish");
+                    return;
+                }
+                
+                const text = document.getElementById('wishText').value.trim();
+                const description = document.getElementById('wishDescription').value.trim();
+                
+                console.log("Menambahkan wish:", text);
+                
+                if (text) {
+                    const wish = {
+                        text: text,
+                        description: description,
+                        completed: false,
+                        date: new Date().toISOString(),
+                        userId: currentUser.uid,
+                        userEmail: currentUser.email,
+                        createdBy: currentUser.displayName
+                    };
+                    
+                    // Add to Firebase dengan promise handling
+                    console.log("Menyimpan ke Firebase:", wish);
+                    
+                    wishesRef.push(wish)
+                        .then(() => {
+                            console.log("Wish berhasil ditambahkan!");
+                            // Clear inputs
+                            document.getElementById('wishText').value = '';
+                            document.getElementById('wishDescription').value = '';
+                            
+                            // Show success message
+                            alert('Wish berhasil ditambahkan!');
+                            
+                            // Switch to view section
+                            showSection('view');
+                        })
+                        .catch((error) => {
+                            console.error("Error menambahkan wish:", error);
+                            alert('Error menambahkan wish: ' + error.message);
+                        });
+                }
+            }
+
+            // Fixed toggleWish function (removed duplicate)
+            function toggleWish(id) {
+                console.log("Toggle wish:", id);
+                const wish = wishes.find(w => w.id === id);
+                if (wish) {
+                    wishesRef.child(id).update({
+                        completed: !wish.completed,
+                        completedBy: !wish.completed ? currentUser.displayName : null,
+                        completedDate: !wish.completed ? new Date().toISOString() : null
+                    })
+                    .then(() => console.log("Status wish diperbarui"))
+                    .catch(error => console.error("Error memperbarui wish:", error));
+                }
+            }
+
+            function deleteWish(id) {
+                if (confirm('Apakah Anda yakin ingin menghapus wish ini?')) {
+                    console.log("Menghapus wish:", id);
+                    wishesRef.child(id).remove()
+                        .then(() => console.log("Wish berhasil dihapus"))
+                        .catch(error => console.error("Error menghapus wish:", error));
+                }
+            }
+
+            function displayWishes() {
+                console.log("Menampilkan wishes dengan filter:", currentFilter);
+                const container = document.getElementById('wishlistItems');
+                container.innerHTML = '';
+                
+                let filteredWishes = wishes;
+                if (currentFilter === 'pending') {
+                    filteredWishes = wishes.filter(w => !w.completed);
+                } else if (currentFilter === 'completed') {
+                    filteredWishes = wishes.filter(w => w.completed);
+                }
+                
+                console.log("Jumlah wishes setelah filter:", filteredWishes.length);
+                
+                if (filteredWishes.length === 0) {
+                    container.innerHTML = '<p>Tidak ada wishes yang ditemukan.</p>';
+                    return;
+                }
+                
+                filteredWishes.forEach(wish => {
+                    const wishElement = document.createElement('div');
+                    wishElement.className = `wishlist-item ${wish.completed ? 'completed' : ''}`;
+                    
+                    let createdInfo = wish.createdBy ? `Dibuat oleh: ${wish.createdBy}` : '';
+                    let completedInfo = wish.completed && wish.completedBy ? 
+                        `<p><em>Diselesaikan oleh ${wish.completedBy} pada ${formatDate(wish.completedDate)}</em></p>` : '';
+                    
+                    wishElement.innerHTML = `
+                        <h3>${wish.text}</h3>
+                        ${wish.description ? `<p>${wish.description}</p>` : ''}
+                        <p><small>${createdInfo} • ${formatDate(wish.date)}</small></p>
+                        ${completedInfo}
+                        <div class="item-actions">
+                            <button onclick="toggleWish('${wish.id}')" class="btn btn-primary">
+                                ${wish.completed ? 'Batalkan' : 'Selesai'}
+                            </button>
+                            <button onclick="deleteWish('${wish.id}')" class="btn btn-primary">Hapus</button>
+                        </div>
+                    `;
+                    container.appendChild(wishElement);
+                });
+            }
+
+            // Format tanggal menjadi format yang lebih mudah dibaca
+            function formatDate(dateString) {
+                if (!dateString) return '';
+                
+                const date = new Date(dateString);
+                const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+                return date.toLocaleDateString('id-ID', options);
+            }
+        } catch (initError) {
+            console.error("Error initializing Firebase:", initError);
+            alert("Terjadi kesalahan saat inisialisasi Firebase: " + initError.message);
         }
 
         // Initialize dan periksa koneksi Firebase
-        window.onload = function() {
-            console.log("Window loaded, memulai aplikasi");
-            // Pengecekan status auth dilakukan oleh onAuthStateChanged
-        };
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM fully loaded, checking elements");
+            const loginBtn = document.getElementById('googleLoginBtn');
+            console.log("Login button found:", !!loginBtn);
+        });
     </script>
 </body>
 </html>
